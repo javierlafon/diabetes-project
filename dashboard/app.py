@@ -4,17 +4,19 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
+import os  # Necesario para leer variables de entorno
 
 # --- 1. CARGA DE DATOS ---
 try:
+    # Nota: Asegúrate de que la ruta sea correcta en tu repositorio de Render
     df = pd.read_csv('../etl/diabetic_data_clean.csv')
-    # Pre-procesamiento para el gráfico de diabetes secundaria
     df['has_diabetes_secondary'] = ((df['diag_2_group'] == 'Diabetes') | (df['diag_3_group'] == 'Diabetes'))
 except Exception as e:
     print(f"Error al cargar el CSV: {e}")
 
 # --- 2. INICIALIZACIÓN DE LA APP ---
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
+server = app.server  # EXPOSICIÓN DEL SERVIDOR PARA GUNICORN/RENDER
 
 # --- 3. DISEÑO (LAYOUT) ---
 app.layout = dbc.Container(fluid=True, children=[
@@ -23,7 +25,7 @@ app.layout = dbc.Container(fluid=True, children=[
                         className="text-center text-primary my-4"), width=12)
     ]),
     
-    # --- SECCIÓN 1: FILTROS GLOBALES (Para los 4 primeros gráficos) ---
+    # --- SECCIÓN 1: FILTROS GLOBALES ---
     dbc.Row([
         dbc.Col([
             html.Label("Segmentar por Género:", className="fw-bold"),
@@ -38,32 +40,30 @@ app.layout = dbc.Container(fluid=True, children=[
         dbc.Col([
             html.Label("Rango de Edad (Aproximada):", className="fw-bold"),
             dcc.RangeSlider(
-    id='age-slider',
-    min=df['age_numeric'].min(),
-    max=df['age_numeric'].max(),
-    value=[df['age_numeric'].min(), df['age_numeric'].max()],
-    # Aquí personalizamos el estilo de cada número/marca
-    marks={i: {'label': f'{i}a', 'style': {'color': 'white', 'fontSize': '12px'}} 
-           for i in range(0, 101, 10)},
-    step=5
-),
+                id='age-slider',
+                min=df['age_numeric'].min(),
+                max=df['age_numeric'].max(),
+                value=[df['age_numeric'].min(), df['age_numeric'].max()],
+                marks={i: {'label': f'{i}a', 'style': {'color': 'white', 'fontSize': '12px'}} 
+                       for i in range(0, 101, 10)},
+                step=5
+            ),
         ], width=9),
     ], className="mb-4 p-3 border border-secondary rounded bg-dark shadow"),
 
-    # --- FILA 1 DE GRÁFICOS (INTERACTIVOS GLOBALES) ---
+    # --- FILAS DE GRÁFICOS ---
     dbc.Row([
         dbc.Col(dbc.Card(dbc.CardBody([dcc.Graph(id='graph-volumen')]), color="secondary", outline=True), width=6),
         dbc.Col(dbc.Card(dbc.CardBody([dcc.Graph(id='graph-edad')]), color="secondary", outline=True), width=6),
     ], className="mb-4"),
 
-    # --- FILA 2 DE GRÁFICOS (INTERACTIVOS GLOBALES) ---
     dbc.Row([
         dbc.Col(dbc.Card(dbc.CardBody([dcc.Graph(id='graph-stay-diag')]), color="secondary", outline=True), width=6),
         dbc.Col(dbc.Card(dbc.CardBody([dcc.Graph(id='graph-diabetes')]), color="secondary", outline=True), width=6),
     ], className="mb-4"),
 
-    # --- SECCIÓN 2: DISTRIBUCIÓN 
     html.Hr(className="my-5", style={"borderTop": "2px solid #3498db"}),
+    
     dbc.Row([
         dbc.Col(html.H2("Distribución de Hospitalización", className="text-center text-info mb-4"), width=12)
     ]),
@@ -88,8 +88,8 @@ app.layout = dbc.Container(fluid=True, children=[
         dbc.Col(dbc.Card(dbc.CardBody([dcc.Graph(id='graph-distribucion')]), color="dark", outline=True), width=9),
     ], className="mb-5"),
 
-    # --- NUEVA SECCIÓN: ESTABILIDAD DEL TRATAMIENTO (INDEPENDIENTE) ---
     html.Hr(className="my-5", style={"borderTop": "2px solid #3498db"}),
+    
     dbc.Row([
         dbc.Col(html.H2("Impacto de la Estabilidad del Tratamiento", className="text-center text-info mb-4"), width=12)
     ]),
@@ -108,7 +108,7 @@ app.layout = dbc.Container(fluid=True, children=[
                         clearable=False,
                         className="text-dark"
                     ),
-                    html.P("Este gráafico cruza el estado de reingreso con los cambios en la medicación.", 
+                    html.P("Este gráfico cruza el estado de reingreso con los cambios en la medicación.", 
                            className="text-muted small mt-4")
                 ])
             ], color="dark", outline=True, className="h-100")
@@ -119,7 +119,6 @@ app.layout = dbc.Container(fluid=True, children=[
 
 # --- 4. CALLBACKS ---
 
-# Callback 1: Gráficos vinculados a filtros de Género y Edad
 @app.callback(
     [Output('graph-volumen', 'figure'),
      Output('graph-edad', 'figure'),
@@ -159,7 +158,6 @@ def update_global_graphs(gender, age_range):
 
     return fig1, fig2, fig3, fig4
 
-# Callback 2: Histograma 
 @app.callback(
     Output('graph-distribucion', 'figure'),
     [Input('hist-bins', 'value'),
@@ -178,16 +176,12 @@ def update_histogram(bins, indicators):
     fig.update_layout(template='plotly_dark', xaxis_title="Días", yaxis_title="Frecuencia")
     return fig
 
-# Callback 3: Gráfico de Estabilidad de Tratamiento
 @app.callback(
     Output('graph-estabilidad', 'figure'),
     [Input('treatment-view-type', 'value')]
 )
 def update_treatment(view_type):
-    # Definimos el orden estricto
     order = ['Stable', 'Low Instability', 'High Instability']
-    
-    
     fig = px.histogram(
         df, 
         x='treatment_status', 
@@ -196,17 +190,17 @@ def update_treatment(view_type):
         category_orders={'treatment_status': order},
         color_discrete_sequence=px.colors.sequential.Viridis,
         text_auto='.0f' if view_type == 'group' else False, 
-        title='6 - Análisis de Reingreso según Estabilidad del Tratamiento - La solución'
+        title='6 - Análisis de Reingreso según Estabilidad del Tratamiento'
     )
-    
     if view_type == 'relative':
         fig.update_layout(barnorm='percent', yaxis_title="Porcentaje (%)")
     else:
         fig.update_layout(yaxis_title="Cantidad de Pacientes")
-
     fig.update_layout(template='plotly_dark', xaxis_title="Estado del Tratamiento")
     return fig
 
-# --- Ejecutamos el dash ---
+# --- EJECUCIÓN ---
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Configuración para que Render asigne el puerto automáticamente
+    port = int(os.environ.get("PORT", 8050))
+    app.run(host='0.0.0.0', port=port, debug=False)
