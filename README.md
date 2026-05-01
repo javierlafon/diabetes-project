@@ -23,17 +23,7 @@ Este proyecto representó un **salto de escala** en mi formación. Dediqué un t
 - **Jupyter Notebooks** (Análisis exploratorio)
 - **Render** (Despliegue)
 
-## 📂 Estructura del Proyecto
 
-├── data/           # Datasets limpios y originales
-├── docs/           # Documentación detallada del proceso
-├── eda/            # Análisis Exploratorio de Datos
-├── etl/            # Scripts de limpieza y transformación
-├── dashboard/      # Código del Dashboard
-
-
-├── app.py          # Archivo principal
-└── requirements.txt
 
 
 ---
