@@ -4,19 +4,25 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
-import os  # Necesario para leer variables de entorno
+import os
 
 # --- 1. CARGA DE DATOS ---
 try:
-    # Nota: Asegúrate de que la ruta sea correcta en tu repositorio de Render
-    df = pd.read_csv('../etl/diabetic_data_clean.csv')
-    df['has_diabetes_secondary'] = ((df['diag_2_group'] == 'Diabetes') | (df['diag_3_group'] == 'Diabetes'))
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(BASE_DIR, 'etl', 'diabetic_data_clean.csv')
+
+    df = pd.read_csv(file_path)
+    df['has_diabetes_secondary'] = (
+        (df['diag_2_group'] == 'Diabetes') |
+        (df['diag_3_group'] == 'Diabetes')
+    )
+
 except Exception as e:
-    print(f"Error al cargar el CSV: {e}")
+    raise RuntimeError(f"Error crítico cargando datos: {e}")
 
 # --- 2. INICIALIZACIÓN DE LA APP ---
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
-server = app.server  # EXPOSICIÓN DEL SERVIDOR PARA GUNICORN/RENDER
+server = app.server
 
 # --- 3. DISEÑO (LAYOUT) ---
 app.layout = dbc.Container(fluid=True, children=[
@@ -25,7 +31,6 @@ app.layout = dbc.Container(fluid=True, children=[
                         className="text-center text-primary my-4"), width=12)
     ]),
     
-    # --- SECCIÓN 1: FILTROS GLOBALES ---
     dbc.Row([
         dbc.Col([
             html.Label("Segmentar por Género:", className="fw-bold"),
@@ -51,7 +56,6 @@ app.layout = dbc.Container(fluid=True, children=[
         ], width=9),
     ], className="mb-4 p-3 border border-secondary rounded bg-dark shadow"),
 
-    # --- FILAS DE GRÁFICOS ---
     dbc.Row([
         dbc.Col(dbc.Card(dbc.CardBody([dcc.Graph(id='graph-volumen')]), color="secondary", outline=True), width=6),
         dbc.Col(dbc.Card(dbc.CardBody([dcc.Graph(id='graph-edad')]), color="secondary", outline=True), width=6),
@@ -201,6 +205,5 @@ def update_treatment(view_type):
 
 # --- EJECUCIÓN ---
 if __name__ == '__main__':
-    # Configuración para que Render asigne el puerto automáticamente
     port = int(os.environ.get("PORT", 8050))
     app.run(host='0.0.0.0', port=port, debug=False)
